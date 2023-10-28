@@ -16,9 +16,17 @@ def main():
 
     rating_df = pd.read_csv(rating_path)
 
+    """Se crean dos instancias del LabelEncoder, que es una herramienta de la biblioteca sklearn.preprocessing.
+    El LabelEncoder se utiliza para transformar valores no numéricos en valores numéricos.
+    En este caso, se tienen dos encoders, uno para usuarios (lbl_user) y otro para películas (lbl_movie)."""
     lbl_user = preprocessing.LabelEncoder()
     lbl_movie = preprocessing.LabelEncoder()
 
+
+    """se están transformando los identificadores de usuario y película originales a valores numéricos codificados.
+    Esto se hace utilizando el método fit_transform de cada LabelEncoder.
+    Después de esta transformación, los identificadores de usuario y película en
+    rating_df son reemplazados por sus valores codificados."""
     rating_df.userId = lbl_user.fit_transform(rating_df.userId.values)
     rating_df.movieId = lbl_movie.fit_transform(rating_df.movieId.values)
 
@@ -30,7 +38,14 @@ def main():
         rating_threshold=1,  # need to use threshold=1 so the model can learn based on RMSE
     )
 
+
+    """Convierte la lista edge_index a un LongTensor de PyTorch. Se utiliza LongTensor porque es el
+    , especialmente cuando se trabaja con métodos que propagan información
+    a través de un grafo."""
     edge_index = torch.LongTensor(edge_index)
+    
+    """Convierte la lista edge_values a un tensor estándar de PyTorch. Aquí no es necesario especificar LongTensor
+    porque edge_values almacena valores (calificaciones en este caso) y no índices."""
     edge_values = torch.tensor(edge_values)
 
     num_users = len(rating_df["userId"].unique())
@@ -55,6 +70,12 @@ def main():
 
     test_edge_index = edge_index[:, test_indices]
     test_edge_value = edge_values[test_indices]
+    
+    
+    """convert_r_mat_edge_index_to_adj_mat_edge_index que definiste
+    previamente para convertir cada conjunto de índices de aristas
+    (y sus respectivos valores) de la matriz de interacción usuario-película
+    a índices de aristas de la matriz de adyacencia."""
 
     (
         train_edge_index,
@@ -75,6 +96,8 @@ def main():
         test_edge_index, test_edge_value, num_users, num_movies
     )
 
+
+    """Instanciaste el modelo LightGCN con un número específico de capas."""
     layers = 1
     model = LightGCN(num_users=num_users, num_items=num_movies, K=layers)
 
@@ -97,15 +120,19 @@ def main():
     model = model.to(device)
     model.train()
 
-    # add decay to avoid overfit
+    """Adam para actualizar los pesos del modelo durante el entrenamiento.
+    Además, añadiste un "weight decay" para evitar el sobreajuste."""
     optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=0.01)
 
+    """Utilizaste un planificador para reducir la tasa de aprendizaje a medida que avanzas en el entrenamiento.
+    Esto puede ayudar a mejorar la convergencia del modelo."""
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
 
     edge_index = edge_index.to(device)
     train_edge_index = train_edge_index.to(device)
     val_edge_index = val_edge_index.to(device)
-
+    """Elegiste el error cuadrático medio (MSE) como función de pérdida, que es común para problemas de regresión,
+    como predecir una calificación."""
     loss_func = nn.MSELoss()
 
     (

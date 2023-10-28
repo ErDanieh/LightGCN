@@ -7,10 +7,13 @@ from collections import defaultdict
 from utils.DatasetUtils import DatasetUtils
 
 
-# defines LightGCN model
+"""Hereda de MessagePassing, lo que te permite
+usar las capacidades de propagación de mensajes del paquete torch_geometric"""
 class LightGCN(MessagePassing):
-    """LightGCN Model as proposed in https://arxiv.org/abs/2002.02126"""
-
+    
+    
+    """inicializaste las incrustaciones (embeddings) de usuario y película, especificaste la
+    dimensionalidad de estas incrustacionesy determinaste el número de capas de paso de mensajes."""
     def __init__(
         self,
         num_users,
@@ -64,44 +67,13 @@ class LightGCN(MessagePassing):
         Returns:
             tuple (Tensor): e_u_k, e_u_0, e_i_k, e_i_0
         """
-
-        """
-            compute \tilde{A}: symmetrically normalized adjacency matrix
-            \tilde_A = D^(-1/2) * A * D^(-1/2)    according to LightGCN paper
         
-            this is essentially a metrix operation way to get 1/ (sqrt(n_neighbors_i) * sqrt(n_neighbors_j))
-
-        
-            if your original edge_index look like
-            tensor([[   0,    0,    0,  ...,  609,  609,  609],
-                    [   0,    2,    5,  ..., 9444, 9445, 9485]])
-                    
-                    torch.Size([2, 99466])
-                    
-            then this will output: 
-                (
-                 tensor([[   0,    0,    0,  ...,  609,  609,  609],
-                         [   0,    2,    5,  ..., 9444, 9445, 9485]]), 
-                 tensor([0.0047, 0.0096, 0.0068,  ..., 0.0592, 0.0459, 0.1325])
-                 )
-                 
-              where edge_index_norm[0] is just the original edge_index
-              
-              and edge_index_norm[1] is the symmetrically normalization term. 
-              
-            under the hood it's basically doing
-                def compute_gcn_norm(edge_index, emb):
-                    emb = emb.weight
-                    from_, to_ = edge_index
-                    deg = degree(to_, emb.size(0), dtype=emb.dtype)
-                    deg_inv_sqrt = deg.pow(-0.5)
-                    deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
-                    norm = deg_inv_sqrt[from_] * deg_inv_sqrt[to_]
-
-                    return norm
-                 
-                
-        """
+        """comenzaste por normalizar el índice de bordes usando gcn_norm.
+        Esto es esencial para los modelos GCN ya que ayuda en la propagación
+        suave de las características a través del grafo.
+        Concatenaste las incrustaciones iniciales de usuario y película y las pasaste a través de las capas del modelo, actualizando las incrustaciones en cada paso.
+        Una vez que las incrustaciones pasan por todas las capas, calculaste el embedding final tomando la media de las incrustaciones en todas las capas, como se sugiere en el documento LightGCN.
+        Finalmente, utilizaste estos embeddings finales para predecir las interacciones entre usuarios y películas."""
         edge_index_norm = gcn_norm(
             edge_index=edge_index, add_self_loops=self.add_self_loops
         )
@@ -160,6 +132,8 @@ class LightGCN(MessagePassing):
 
         return output
 
+
+    """se deben combinar las incrustaciones de los nodos vecinos durante el proceso de propagación de mensajes."""
     def message(self, x_j, norm):
         return norm.view(-1, 1) * x_j
 

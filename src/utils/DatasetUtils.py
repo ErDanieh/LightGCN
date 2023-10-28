@@ -5,7 +5,12 @@ from torch_sparse import SparseTensor
 
 
 class DatasetUtils:
-    # load edges between users and movies
+
+    
+    """Procesa las aristas entre usuarios y películas a partir de un DataFrame de
+    pandas que representa las interacciones entre usuarios y películas. Esta función
+    es útil para preparar los datos para ser alimentados a una arquitectura de grafo,
+    como es el caso de LightGCN en un sistema de recomendación."""
     def load_edge_csv(
         df, src_index_col, dst_index_col, link_index_col, rating_threshold=3.5
     ):
@@ -33,6 +38,10 @@ class DatasetUtils:
 
         link_vals = df[link_index_col].values
 
+        # Se itera sobre todas las interacciones en edge_attr
+        """Si la interacción es positiva (calificación por encima del umbral),
+        se añade la arista correspondiente (usuario, película) a edge_index y se
+        añade la calificación a edge_values"""
         edge_attr = (
             torch.from_numpy(df[link_index_col].values).view(-1, 1).to(torch.long)
             >= rating_threshold
@@ -47,12 +56,19 @@ class DatasetUtils:
                 edge_index[1].append(dst[i])
                 edge_values.append(link_vals[i])
 
-        # edge_values is the label we will use for compute training loss
+        """edge_values, que contiene las calificaciones asociadas a esas aristas."""
         return edge_index, edge_values
 
+
+
+    """La función convert_r_mat_edge_index_to_adj_mat_edge_index está diseñada para convertir una matriz
+    de interacción usuario-película en forma de índices de aristas a una matriz de adyacencia de forma
+    dispersa (COO)."""
     def convert_r_mat_edge_index_to_adj_mat_edge_index(
         input_edge_index, input_edge_values, num_users, num_movies
     ):
+        """Inicializa una matriz R con ceros de tamaño num_users x num_movies. Esta matriz representará
+        las interacciones entre usuarios y películas."""
         R = torch.zeros((num_users, num_movies))
         for i in range(len(input_edge_index[0])):
             row_idx = input_edge_index[0][i]
@@ -63,11 +79,16 @@ class DatasetUtils:
 
         R_transpose = torch.transpose(R, 0, 1)
 
+    
+        """Inicializa una matriz de adyacencia con ceros de tamaño (num_users + num_movies) x (num_users + num_movies).
+        Esta matriz representará las relaciones entre todos los nodos (tanto usuarios como películas).
+        La primera mitad de las filas representará a los usuarios, y la segunda mitad a las películas."""
         # create adj_matrix
         adj_mat = torch.zeros((num_users + num_movies, num_users + num_movies))
         adj_mat[:num_users, num_users:] = R.clone()
         adj_mat[num_users:, :num_users] = R_transpose.clone()
 
+        """Se convierte la matriz de adyacencia adj_mat a formato COO, que es una representación dispersa."""
         adj_mat_coo = adj_mat.to_sparse_coo()
         adj_mat_coo_indices = adj_mat_coo.indices()
         adj_mat_coo_values = adj_mat_coo.values()
@@ -76,16 +97,23 @@ class DatasetUtils:
     def convert_adj_mat_edge_index_to_r_mat_edge_index(
         input_edge_index, input_edge_values, num_users, num_movies
     ):
+        """Se convierten los índices de aristas de entrada y los valores asociados a un formato SparseTensor
+        utilizando la biblioteca de PyTorch. Esta es una estructura de datos que representa matrices dispersas.
+        Los índices de las aristas y los valores son utilizados como las filas,
+        columnas y valores respectivos del tensor disperso"""
         sparse_input_edge_index = SparseTensor(
             row=input_edge_index[0],
             col=input_edge_index[1],
             value=input_edge_values,
             sparse_sizes=((num_users + num_movies), num_users + num_movies),
         )
-
+        
+        """Esto facilita la extracción de la submatriz que representa las interacciones usuario-película."""
         adj_mat = sparse_input_edge_index.to_dense()
+        """A partir de la matriz de adyacencia densa, se extrae la submatriz de interacción usuario-película."""
         interact_mat = adj_mat[:num_users, num_users:]
-
+        """Se convierte la matriz de interacción densa a formato COO para obtener los índices de
+        las aristas y sus valores correspondientes."""
         r_mat_edge_index = interact_mat.to_sparse_coo().indices()
         r_mat_edge_values = interact_mat.to_sparse_coo().values()
 
