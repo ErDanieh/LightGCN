@@ -1,3 +1,8 @@
+import warnings
+
+# Disable all warnings
+warnings.filterwarnings('ignore')
+
 import numpy as np
 import pandas as pd
 from libreco.data import random_split, DatasetPure
@@ -44,11 +49,12 @@ evaluate(
 )
 
 # predict preference of user 2211 to item 110
-lightgcn.predict(user=2211, item=110)
+print(f"Predict: {lightgcn.predict(user=2211, item=110)}")
 # recommend 7 items for user 2211
-lightgcn.recommend_user(user=2211, n_rec=7)
+print(f"Recommend: {lightgcn.recommend_user(user=2211, n_rec=7)}")
 
 # cold-start prediction
-lightgcn.predict(user="ccc", item="not item", cold_start="average")
+print(f'Predict: {lightgcn.predict(user="ccc", item="not item", cold_start="average")}')
+
 # cold-start recommendation
-lightgcn.recommend_user(user="are we good?", n_rec=7, cold_start="popular")
+print(f'Recommend: {lightgcn.recommend_user(user="are we good?", n_rec=7, cold_start="popular")}')
